@@ -82,5 +82,17 @@ any(is.infinite(fqa_tidy_clean$c))
 # Check for NaN values
 any(is.nan(fqa_tidy_clean$c)) 
 
+fqa_tidy_clean <- fqa_tidy_clean %>% filter(!is.na(c))
+
+# Ensure 'c' is numeric
+fqa_tidy_clean$c <- as.numeric(fqa_tidy_clean$c)
+
+# Ensure 'transect_name' is a factor
+fqa_tidy_clean$transect_name <- as.factor(fqa_tidy_clean$transect_name)
+
+model <- aov(c ~ transect_name, data = fqa_tidy_clean)
+summary(model)
+
+#The ANOVA indicates a marginally significant effect of transect_name on c, with a p-value of 0.075. This suggests that transect_name may have a weak influence on c, but the result is not strong enough to confidently reject the null hypothesis at the typical 0.05 significance level
   
   
