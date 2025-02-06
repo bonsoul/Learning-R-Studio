@@ -28,6 +28,9 @@ plot(pressure)
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
+library(usethis)
+use_git_config(user.name = "bonsoul",user.email = "bonsoul24@gmail.com")
+
 library(here)
 install.packages("janitor")
 
@@ -55,4 +58,41 @@ fqa_tidy <- fqa %>%
 view(fqa_tidy)
 fqa_tidy %>% count(c)
 ggplot2(fqa_tidy, aes(x = c)) 
+# visualization
+library(ggplot2)
+
+# Example plot
+ggplot(fqa_tidy, aes(x = c)) + 
+  geom_bar()
+
+sum(is.na(fqa_tidy$c))  # Count NAs 
+
+
+ # Remove rows with NA in 'c'
+fqa_tidy_clean <- fqa_tidy %>% filter(!is.na(c))
+
+#running anova
+model <- aov(c ~ transect_name, data = fqa_tidy_clean)
+ 
+# Check if there are any non-numeric values in 'c'
+summary(fqa_tidy_clean$c)
+
+# Check for Inf values
+any(is.infinite(fqa_tidy_clean$c))
+# Check for NaN values
+any(is.nan(fqa_tidy_clean$c)) 
+
+fqa_tidy_clean <- fqa_tidy_clean %>% filter(!is.na(c))
+
+# Ensure 'c' is numeric
+fqa_tidy_clean$c <- as.numeric(fqa_tidy_clean$c)
+
+# Ensure 'transect_name' is a factor
+fqa_tidy_clean$transect_name <- as.factor(fqa_tidy_clean$transect_name)
+
+model <- aov(c ~ transect_name, data = fqa_tidy_clean)
+summary(model)
+
+#The ANOVA indicates a marginally significant effect of transect_name on c, with a p-value of 0.075. This suggests that transect_name may have a weak influence on c, but the result is not strong enough to confidently reject the null hypothesis at the typical 0.05 significance level
+  
   
