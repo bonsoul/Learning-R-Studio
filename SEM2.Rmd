@@ -18,7 +18,9 @@ shell("cls")
 ```
 
 ```{r, reading the data}
-library(readxl)
+library(readr)
+library(ggplot2)
+library(dplyr)
 
 data <- read_csv("SEM/enhanced_student_habits_performance_dataset/enhanced_student_habits_performance_dataset.csv")
 
@@ -29,7 +31,6 @@ head(data)
 ```{r, cleaning the dataset}
 str(data)
 summary(data)
-skim(data)
 
 ```
 
@@ -200,8 +201,10 @@ modindices(fit_exam, sort.=TRUE, minimum.value = 10)  # inspect potential improv
 semPaths(fit_exam, "std", whatLabels = "std", layout = "tree", edge.label.cex = 0.8)
 ```
 
+
 ```{r}
-install.packages("semPlot")
+install.packages("pbapply")
+
 ```
 
 
