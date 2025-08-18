@@ -7,6 +7,8 @@ editor_options:
   chunk_output_type: console
 ---
 
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -122,6 +124,11 @@ data <- data %>%
 
 ```
 
+```{r}
+colnames(data)
+```
+
+
 ```{r, drop the third variable in gender}
 data <- data %>%
   mutate(
@@ -188,7 +195,7 @@ model_exam <- '
 ```
 
 ```{r}
-unique(data$gender)
+library(semPlot)
 ```
 
 
@@ -197,32 +204,13 @@ unique(data$gender)
 fit_exam <- sem(model_exam, data = data, estimator = "MLR", missing = "fiml", std.lv = TRUE)
 summary(fit_exam, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
 parameterEstimates(fit_exam, standardized = TRUE) %>% dplyr::arrange(desc(abs(std.all)))
-modindices(fit_exam, sort.=TRUE, minimum.value = 10)
+#modindices(fit_exam, sort.=TRUE, minimum.value = 10)
 semPaths(fit_exam, "std", whatLabels = "std", layout = "tree", edge.label.cex = 0.8)
 ```
 
 
-```{r}
-install.packages("umx", repos = "https://cloud.r-project.org/")
-library(umx)
-install.OpenMx("NPSOL")
-
-
-```
 
 ```{r}
-library(umx)
-```
-
-
-```{r}
-install.OpenMx("NPSOL")
-```
-
-
-```{r}
-# install if needed
-
 library(semPlot)
 
 # Fit SEM (example)
@@ -246,6 +234,29 @@ semPaths(
   mar = c(5, 5, 5, 5)
 )
 
+```
+
+```{r}
+# Save high-resolution SEM plot as PNG
+png("SEM_plot.png", width = 2000, height = 1500, res = 300)
+
+semPaths(
+  fit_exam,
+  what = "std",          # show standardized estimates
+  layout = "tree",       # cleaner tree-like layout
+  rotation = 2,          # rotate for readability
+  style = "lisrel",      # professional SEM style
+  nCharNodes = 0,        # full variable names
+  edge.label.cex = 0.9,  # size of path coefficients
+  sizeMan = 6,           # size of observed variables
+  sizeLat = 8,           # size of latent variables
+  mar = c(5, 5, 5, 5),   # margins
+  residuals = FALSE,     # hide residual arrows
+  intercepts = FALSE,    # hide intercepts
+  curve = 2              # curvature of arrows
+)
+
+dev.off()
 ```
 
 
