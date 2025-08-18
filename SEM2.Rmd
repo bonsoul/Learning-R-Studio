@@ -201,10 +201,9 @@ modindices(fit_exam, sort.=TRUE, minimum.value = 10)  # inspect potential improv
 semPaths(fit_exam, "std", whatLabels = "std", layout = "tree", edge.label.cex = 0.8)
 ```
 
-
 ```{r}
+install.packages("semPlot", dependencies = TRUE)
 install.packages("pbapply")
-
 ```
 
 
