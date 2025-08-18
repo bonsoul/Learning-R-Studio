@@ -1,0 +1,447 @@
+---
+title: "FRANCIS MOTIRI"
+author: "Bonsoul"
+date: "2025-08-09"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, libraries, include=FALSE}
+library(pacman)
+
+pacman::p_load(dplyr, skimr, janitor,readr, lubridate, stringr, ggplot2,tidyr,scales, kableExtra, knitr, tidyverse)
+
+```
+
+```{r, data, include=FALSE}
+
+df1 <- read_csv("D:/Downloads/R Case Studies/FRANCIS MOTIRI/Francis_RQ (2).csv")
+
+```
+
+
+```{r, understanding the structure of the dataset, include=FALSE}
+str(df1)
+summary(df1)
+colnames(df1)
+
+```
+
+
+```{r, clean column names, include=FALSE}
+
+df2 <- df1 %>% janitor::clean_names()
+```
+
+```{r,include=FALSE}
+df2$age_on_registration <- as.numeric(gsub("Y", "", df2$age_on_registration))
+
+```
+
+
+
+
+```{r, converting date columns, include=FALSE}
+date_cols <- c(
+  "date_of_registration",
+  "date_of_treatment_started",
+  "treatment_outcome_date"
+)
+
+# Convert all of them to Date type
+df3 <- df2 %>%
+  mutate(across(all_of(date_cols), ~ suppressWarnings(dmy(.))))
+
+# Check the conversion
+str(df3[date_cols])
+
+```
+
+
+```{r, gender, include=FALSE}
+df3 <- df3 %>%
+  mutate(sex_m_f = str_to_lower(sex_m_f),
+         sex_m_f = recode(sex_m_f, "m" = "male", "f" = "female"))
+```
+
+```{r, include=FALSE}
+skim(df3)
+```
+
+```{r, include=FALSE}
+cat_vars <- names(Filter(is.character, df3))
+
+df3 %>%
+  select(all_of(cat_vars)) %>%
+  summary
+```
+
+```{r, num variables, include=FALSE}
+num_vars <- names(Filter(is.numeric, df3))
+
+df3 %>%
+  select(all_of(num_vars)) %>%
+  summary()
+
+```
+
+```{r, missing summary, include=TRUE}
+missing_summary <- data.frame(
+  column = names(df3),
+  missing_percent = colSums(is.na(df3)) / nrow(df3) * 100
+) 
+
+# Format the missing_percent column
+missing_summary$missing_percent <- paste0(round(missing_summary$missing_percent, 2), "%")
+
+
+missing_summary
+
+
+```
+
+```{r, drop columns, include=FALSE}
+# Drop columns with >75% missing
+df4 <- df3 %>%
+  select(where(~ mean(is.na(.)) <= 0.75))
+
+# Check remaining columns
+missing_summary <- data.frame(
+  column = names(df4),
+  missing_percent = colSums(is.na(df4)) / nrow(df4) * 100
+) %>%
+  arrange(desc(missing_percent))
+
+missing_summary
+
+```
+
+
+
+```{r, tb_trend, include=FALSE}
+df4 <- df4 %>%
+  mutate(year_month = floor_date(date_of_registration, "month"))
+
+tb_trend <- df4 %>%
+  group_by(year_month) %>%
+  summarise(total_cases = n(),
+            deaths = sum(treatment_outcome == "Died", na.rm = TRUE))
+
+print(tb_trend)
+  
+  
+```
+
+
+```{r, trend analysis, include=TRUE}
+
+ggplot(tb_trend, aes(x = year_month)) +
+  geom_line(aes(y = total_cases, color = "Total Cases"), linewidth = 1)+
+  geom_point(aes(y = total_cases, color = "Total Cases"), size = 2) +
+  geom_line(aes(y = deaths, color = "Deaths"), linewidth = 1) +
+  geom_point(aes(y = deaths, color = "Deaths"), size = 2) +
+  labs(
+    title = "TB Cases and Deaths Over Time",
+    x = "Year-Month",
+    y = "Count",
+    color = "Legend"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c("Total Cases" = "steelblue", "Deaths" = "red"))
+
+```
+
+
+```{r, include=FALSE}
+df4 <- df4 %>%
+  filter(if_all(everything(), ~ !is.na(.)))
+```
+
+
+
+
+```{r, numerical columns, include=TRUE}
+df4 %>%
+  select(where(is.numeric), -c(mfl_code, serial_number, quarter)) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(
+    bins = 30, 
+    fill = "#69b3a2", 
+    color = "white", 
+    alpha = 0.8
+  ) +
+  facet_wrap(~variable, scales = "free", ncol = 3) +
+  labs(
+    title = "Distribution of Numeric Variables",
+    x = "Value",
+    y = "Frequency"
+  ) +
+  theme_light(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#333333"),
+    strip.text = element_text(face = "bold", size = 12, color = "#2c3e50"),
+    panel.border = element_rect(color = "grey80", fill = NA),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank()
+  )
+
+
+```
+
+
+```{r, include=FALSE}
+df5 <- df4 %>%
+  mutate(period = case_when(
+    year < 2020 ~ "Pre-COVID",
+    year >= 2020 & year <= 2022 ~ "COVID",
+    TRUE ~ "Post-COVID"
+  ))
+
+# Summary table
+summary_period <- df5 %>%
+  group_by(period) %>%
+  summarise(total_cases = n(),
+            deaths = sum(treatment_outcome == "Died", na.rm = TRUE),
+            mortality_rate = deaths / total_cases * 100,
+            .groups = "drop")
+
+```
+
+```{r, Summary of Cases and Mortality by Period, include=TRUE}
+summary_period %>%
+  kable(
+    format = "html",
+    col.names = c("Period", "Total Cases", "Deaths", "Mortality Rate (%)"),
+    digits = 2,
+    caption = "Summary of Cases and Mortality by Period"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+
+
+```{r, categorical variables, include=FALSE}
+categorical_vars1 <- df5 %>%
+  select(where(~ is.character(.) | is.factor(.))) %>%
+  names()
+
+cat_summary <- function(data, var) {
+  data %>%
+    group_by(across(all_of(var))) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(percent = round((n / sum(n)) * 100, 2)) %>%
+    arrange(desc(n))
+}
+
+```
+
+
+```{r, function, include=FALSE}
+
+# Function to visualise categorical summaries
+plot_cat <- function(data, var) {
+  data %>%
+    group_by({{ var }}) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(pct = n / sum(n) * 100) %>%
+    ggplot(aes(x = reorder(as.character({{ var }}), -n), y = n, fill = as.character({{ var }}))) +
+    geom_col(show.legend = FALSE) +
+    geom_text(aes(label = paste0(n, " (", round(pct, 1), "%)")), vjust = -0.5, size = 3) +
+    labs(
+      title = paste("Distribution of", deparse(substitute(var))),
+      x = deparse(substitute(var)),
+      y = "Count"
+    ) +
+    theme_minimal() +
+    theme(plot.title = element_text(face = "bold", size = 14)) +
+    scale_y_continuous(labels = scales::comma)
+}
+
+# --- Filter for Top 10 Counties ---
+top_counties <- df5 %>%
+  count(county, sort = TRUE) %>%
+  slice_head(n = 10) %>%
+  pull(county)
+
+df5_top10 <- df5 %>%
+  filter(county %in% top_counties)
+
+
+```
+
+```{r, plots, include=TRUE}
+# Now plot each categorical variable
+plot_cat(df5, sector)
+plot_cat(df5, type_of_tb_p_ep)
+plot_cat(df5, xray)
+plot_cat(df5_top10, county)
+plot_cat(df5, type_of_patient)
+plot_cat(df5, gene_xpert)
+plot_cat(df5, sputum_smear_examination_2by3_month_result)
+
+```
+
+
+```{r,time variables, include=FALSE}
+# Define COVID start date
+covid_start <- as.Date("2020-03-01")
+
+# Create key time variables
+df6 <- df5 %>%
+  mutate(
+    date_of_registration = as_date(date_of_registration),  # convert to date
+    reg_year = year(date_of_registration),
+    reg_month = month(date_of_registration),
+    reg_yearmonth = floor_date(date_of_registration, "month"),
+    period = case_when(
+      !is.na(date_of_registration) & date_of_registration >= covid_start ~ "COVID",
+      !is.na(date_of_registration) & date_of_registration <  covid_start ~ "Pre-COVID",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+
+
+
+```{r, include=FALSE}
+
+# Count unique new registered cases per month and period
+incidence_monthly <- df6 %>%
+  filter(!is.na(date_of_registration)) %>%
+  group_by(reg_yearmonth) %>%
+  summarise(
+    cases = n_distinct(serial_number),  # replace with your actual unique ID column
+    period = ifelse(first(reg_yearmonth) >= floor_date(covid_start, "month"), "COVID", "Pre-COVID")
+  ) %>%
+  arrange(reg_yearmonth)
+
+
+
+```
+
+
+```{r,Monthly TB Registrations in Kenya, include=FALSE}
+# Ensure reg_yearmonth is Date and add period classification
+incidence_monthly <- incidence_monthly %>%
+  mutate(
+    reg_yearmonth = as.Date(reg_yearmonth),
+    period = ifelse(reg_yearmonth >= floor_date(covid_start, "month"), "COVID", "Pre-COVID")
+  )
+
+# Plot incidence
+p_incidence <- ggplot(incidence_monthly, aes(x = reg_yearmonth, y = cases, color = period, group = 1)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  geom_vline(xintercept = floor_date(covid_start, "month"), 
+             linetype = "dashed", color = "red", size = 1) +
+  geom_smooth(method = "loess", se = FALSE, linetype = "solid", size = 0.8, alpha = 0.5) +
+  scale_x_date(date_labels = "%b-%Y", date_breaks = "3 months", 
+               expand = expansion(mult = c(0.01, 0.05))) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Monthly TB Registrations in Kenya",
+    subtitle = paste("Dashed red line = COVID start:", covid_start),
+    x = "Month",
+    y = "Unique TB cases",
+    color = "Period"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+
+```
+
+
+```{r,include=TRUE}
+print(p_incidence)
+```
+
+
+```{r, Statistical test, include=FALSE}
+# Statistical test: compare monthly counts pre vs during (t-test on monthly totals)
+monthly_counts <- df6 %>%
+  filter(!is.na(reg_yearmonth)) %>%
+  group_by(reg_yearmonth) %>%
+  summarise(cases = n_distinct(serial_number)) %>%
+  mutate(period = ifelse(reg_yearmonth >= floor_date(covid_start, "month"),
+                         "COVID", "Pre-COVID"))
+
+
+tt_incidence <- t.test(cases ~ period, data = monthly_counts)
+```
+
+```{r, t-test, include=TRUE}
+
+# Convert the t-test output into a data frame
+tt_df <- data.frame(
+  Statistic = tt_incidence$statistic,
+  Parameter = tt_incidence$parameter,
+  P_Value = tt_incidence$p.value,
+  Conf_Lower = tt_incidence$conf.int[1],
+  Conf_Upper = tt_incidence$conf.int[2],
+  Mean_Group1 = tt_incidence$estimate[1],
+  Mean_Group2 = tt_incidence$estimate[2]
+)
+
+# Create a nice kable table
+kable(tt_df, 
+      caption = "Tuberculosis Incidence T-Test Summary",
+      align = "c",
+      digits = 3) %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+
+
+```{r, include=FALSE}
+# Identify deaths (common label variations)
+df7 <- df6 %>%
+  mutate(
+    treatment_outcome_clean = tolower(as.character(treatment_outcome)),
+    died_flag = case_when(
+      grepl("died|death|dead", treatment_outcome_clean, ignore.case = TRUE) ~ 1L,
+      TRUE ~ 0L
+    )
+  )
+
+# Use treatment_outcome_date if available, otherwise use date_of_registration to assign period
+df7 <- df7 %>%
+  mutate(
+    outcome_date = coalesce(treatment_outcome_date, date_of_registration),
+    outcome_period = case_when(
+      !is.na(outcome_date) & outcome_date >= covid_start ~ "COVID",
+      !is.na(outcome_date) & outcome_date <  covid_start ~ "Pre-COVID",
+      TRUE ~ NA_character_
+    )
+  )
+
+mortality_by_period <- df7 %>%
+  filter(!is.na(outcome_period)) %>%
+  group_by(outcome_period) %>%
+  summarise(
+    deaths = sum(died_flag, na.rm = TRUE),
+    cases = n_distinct(serial_number),
+    case_fatality_rate = deaths / cases
+  )
+
+
+
+```
+
