@@ -77,8 +77,9 @@ corrplot(cor(num_data, use = "pairwise.complete.obs"),method = "color")
 #study hours vs exam_score
 ggplot(data, aes(x = study_hours_per_day, y = exam_score)) +
   geom_point(alpha = 0.6, color = "darkgreen") +
-  geom_smooth(method = "lm", color = "red") +
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = TRUE) +
   theme_minimal()
+
 
 ```
 
@@ -110,7 +111,6 @@ ggplot(data, aes(x = internet_quality, fill = dropout_risk)) +
 ```{r}
 library(lavaan)
 library(dplyr)
-library(semPlot)
 ```
 
 ```{r,Minimal cleaning for factors (keep only needed variables here)}
@@ -197,13 +197,26 @@ unique(data$gender)
 fit_exam <- sem(model_exam, data = data, estimator = "MLR", missing = "fiml", std.lv = TRUE)
 summary(fit_exam, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
 parameterEstimates(fit_exam, standardized = TRUE) %>% dplyr::arrange(desc(abs(std.all)))
-modindices(fit_exam, sort.=TRUE, minimum.value = 10)  # inspect potential improvements
+modindices(fit_exam, sort.=TRUE, minimum.value = 10)
 semPaths(fit_exam, "std", whatLabels = "std", layout = "tree", edge.label.cex = 0.8)
 ```
 
+
 ```{r}
-install.packages("semPlot", dependencies = TRUE)
-install.packages("pbapply")
+install.packages("umx", repos = "https://cloud.r-project.org/")
+library(umx)
+install.OpenMx("NPSOL")
+
+
+```
+
+```{r}
+library(umx)
+```
+
+
+```{r}
+install.OpenMx("NPSOL")
 ```
 
 
