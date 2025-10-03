@@ -2,8 +2,11 @@
 title: "FRANCIS MOTIRI"
 author: "Bonsoul"
 date: "2025-08-09"
-output: html_document
-editor_options: 
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+editor_options:
   chunk_output_type: console
 ---
 
@@ -15,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, libraries, include=FALSE}
 library(pacman)
 
-pacman::p_load(dplyr, skimr, janitor,readr, lubridate, stringr, ggplot2,tidyr,scales, kableExtra, knitr, tidyverse)
+pacman::p_load(dplyr, skimr, janitor,readr, lubridate, stringr, ggplot2,tidyr,scales, kableExtra, knitr, tidyverse, funModeling, gtsummary, flextable)
 
 ```
 
@@ -123,7 +126,6 @@ missing_summary
 ```
 
 
-
 ```{r, tb_trend, include=FALSE}
 df4 <- df4 %>%
   mutate(year_month = floor_date(date_of_registration, "month"))
@@ -163,6 +165,65 @@ df4 <- df4 %>%
   filter(if_all(everything(), ~ !is.na(.)))
 ```
 
+```{r, restructing variables, include=FALSE}
+# Recode treatment outcomes
+df4$treatment_outcome <- recode(df4$treatment_outcome,
+                                    "C"    = "Cured",
+                                    "D"    = "Died",
+                                    "F"    = "Failed",
+                                    "LTFU" = "Lost to Follow-up",
+                                    "MT4"  = "Transferred Out",
+                                    "TC"   = "Treatment Completed",
+                                    "TO"   = "On Treatment")
+
+```
+
+
+```{r, include=FALSE}
+df4 <- df4 %>%
+  mutate(sputum_smear_examination_2by3_month_result = case_when(
+    sputum_smear_examination_2by3_month_result == "Neg" ~ "Negative",
+    sputum_smear_examination_2by3_month_result == "Pos" ~ "Positive",
+    sputum_smear_examination_2by3_month_result == "ND" ~ "Not Done",
+    TRUE ~ sputum_smear_examination_2by3_month_result
+  ))
+```
+
+```{r, include=FALSE}
+df4 <- df4 %>%
+  mutate(type_of_tb_std = case_when(
+    type_of_tb_p_ep == "P"  ~ "Pulmonary",
+    type_of_tb_p_ep == "EP" ~ "Extra-pulmonary",
+    TRUE ~ type_of_tb_p_ep
+  ))
+```
+
+
+```{r, include=FALSE}
+df4 <- df4 %>%
+  mutate(type_of_patient = case_when(
+    type_of_patient == "N"   ~ "New",
+    type_of_patient == "R"   ~ "Relapse",
+    type_of_patient == "F"   ~ "Failure",
+    type_of_patient == "TI"  ~ "Treatment after Interruption",
+    type_of_patient == "TLF" ~ "Treatment after Loss to Follow-up",
+    type_of_patient == "PT"  ~ "Palliative/Previously Treated",
+    type_of_patient == "THU" ~ "Transfer In",
+    TRUE ~ type_of_patient
+  ))
+```
+
+```{r}
+df4 <- df4 %>%
+  mutate(
+    type_of_tb_p_ep = case_when(
+      type_of_tb_p_ep == "P"  ~ "Pulmonary TB",
+      type_of_tb_p_ep == "EP" ~ "Extrapulmonary TB",
+      TRUE ~ NA_character_  # for missing or other unexpected values
+    )
+  )
+
+```
 
 
 
@@ -192,6 +253,256 @@ df4 %>%
     panel.grid.minor = element_blank()
   )
 
+
+```
+
+
+
+```{r}
+p_age1 <- df4 %>%
+  ggplot(aes(x = age_on_registration)) +
+  geom_histogram(
+    binwidth = 10, fill = "#69b3a2", color = "white", alpha = 0.9
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 10),
+    limits = c(0, 100)
+  ) +
+  labs(
+    title = "Distribution of Age",
+    x = "Age Group",
+    y = "Frequency"
+  ) +
+  theme_minimal(base_size = 14) +  # clean background
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16, color = "#2c3e50"),
+    axis.title = element_text(face = "bold", size = 13, color = "#2c3e50"),
+    axis.text = element_text(size = 11, color = "#34495e"),
+    panel.grid.major = element_line(color = "grey85"),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_age1)
+
+```
+
+
+```{r}
+p_month <- df4 %>%
+  mutate(month = factor(month, levels = 1:12, labels = month.name)) %>%
+  ggplot(aes(x = month)) +
+  geom_bar(fill = "#69b3a2", color = "white", alpha = 0.8) +
+  labs(
+    title = "Distribution of Month",
+    x = "Month",
+    y = "Count"
+  ) +
+  theme_light(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # tilt labels
+  )
+
+p_month
+
+```
+
+```{r}
+
+df4 %>%
+  filter(!is.na(age_on_registration)) %>%   # drop missing ages
+  mutate(
+    # Age groups (10-year bins up to 100)
+    age_group = cut(
+      age_on_registration,
+      breaks = seq(0, 100, by = 10),   # 0–10, 10–20, …, 90–100
+      right = FALSE,
+      labels = paste0(seq(0, 90, by = 10), "-", seq(9, 99, by = 10))
+    )
+  ) %>%
+  ggplot(aes(x = age_group, fill = sex_m_f)) +
+  geom_bar(position = "dodge", alpha = 0.9) +
+  scale_fill_manual(values = c("#3498db", "#e74c3c")) +
+  labs(
+    title = "Distribution of Cases by Age Group and Sex",
+    x = "Age Group",
+    y = "Number of Cases",
+    fill = "Sex"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16, color = "#2c3e50"),
+    axis.title = element_text(face = "bold", size = 13, color = "#2c3e50")
+  )
+
+```
+
+
+```{r}
+
+# Sociodemographics
+
+table1 <- df4 %>%
+  # keep only relevant sociodemographics
+  select(
+    age_on_registration,
+    sex_m_f,
+    region,
+    county,
+    weight_kgs,
+    height_mtrs,
+    bmi
+  ) %>%
+  mutate(
+    # force numeric for continuous vars
+    age_on_registration = as.numeric(age_on_registration),
+    weight_kgs = as.numeric(weight_kgs),
+    height_mtrs = as.numeric(height_mtrs),
+    bmi = as.numeric(bmi),
+
+    # Age groups in 10-year bins up to 100
+    age_group = cut(
+      age_on_registration,
+      breaks = seq(0, 100, by = 10),
+      right = FALSE,
+      labels = paste0(seq(0, 90, by = 10), "-", seq(9, 99, by = 10))
+    ),
+    # Weight groups: 20-kg bins up to 100
+    weight_group = cut(
+      weight_kgs,
+      breaks = seq(0, 100, by = 20),
+      right = FALSE,
+      labels = paste0(seq(0, 80, by = 20), "-", seq(19, 99, by = 20))
+    ),
+    # Height groups: 1m to 3m in 0.25m bins
+    height_group = cut(
+      height_mtrs,
+      breaks = seq(1, 3, by = 0.25),
+      right = FALSE,
+      labels = paste0(seq(1, 2.75, by = 0.25), "-", seq(1.24, 2.99, by = 0.25))
+    ),
+    # BMI groups: 10-unit bins up to 55
+    bmi_group = cut(
+      bmi,
+      breaks = seq(0, 55, by = 10),
+      right = FALSE,
+      labels = paste0(seq(0, 45, by = 10), "-", seq(9, 55, by = 10))
+    )
+  ) %>%
+  # drop original continuous vars (keep grouped versions)
+  select(-age_on_registration, -weight_kgs, -height_mtrs, -bmi) %>%
+  # drop rows with missing values in key variables
+  filter(!is.na(sex_m_f), !is.na(region), !is.na(county)) %>%
+  tbl_summary(
+    by = sex_m_f,   # stratify by sex
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    missing = "no"
+  ) %>%
+  add_n() %>%
+  add_overall() %>%
+  bold_labels()
+
+table1
+
+```
+
+```{r}
+# Facility / Health System Descriptives
+table2 <- df4 %>%
+  select(
+    kephlevel,
+    ownertype,
+    sector
+  ) %>%
+  tbl_summary(
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    missing = "no"
+  ) %>%
+  add_n() %>%
+  bold_labels()
+
+table2
+```
+
+```{r}
+# Clinical/TB Profile
+table3 <- df4 %>%
+  select(
+    type_of_tb_p_ep,
+    type_of_patient,
+    gene_xpert,
+    nutrition_support,
+    regimen
+  ) %>%
+  tbl_summary(
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    missing = "no"
+  ) %>%
+  add_n() %>%
+  bold_labels()
+
+table3
+```
+
+```{r}
+# Diagnostics
+table4 <- df4 %>%
+  select(
+    xray,
+    sputum_smear_examination_0th_month_result,
+    sputum_smear_examination_2by3_month_result,
+    sputam_smear_examination_5th_month_result,
+    sputum_smear_examination_6by8_month_result
+  ) %>%
+  tbl_summary(
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    missing = "no"
+  ) %>%
+  add_n() %>%
+  bold_labels()
+
+table4
+```
+
+```{r}
+# Outcomes
+table5 <- df4 %>%
+  select(
+    treatment_outcome
+  ) %>%
+  tbl_summary(
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    missing = "no"
+  ) %>%
+  add_n() %>%
+  bold_labels()
+table5
+```
+
+
+```{r}
+# Example: Export Sociodemographics Table 1
+
+
+table1 %>%
+  as_flex_table() %>%
+  flextable::save_as_docx(path = "Table1_Sociodemographics.docx")
+
+table2 %>%
+  as_flex_table() %>%
+  flextable::save_as_docx(path = "Table2_Sociodemographics.docx")
+
+table3 %>%
+  as_flex_table() %>%
+  flextable::save_as_docx(path = "Table3_Sociodemographics.docx")
+
+table4 %>%
+  as_flex_table() %>%
+  flextable::save_as_docx(path = "Table4_Sociodemographics.docx")
+
+table5 %>%
+  as_flex_table() %>%
+  flextable::save_as_docx(path = "Table5_Sociodemographics.docx")
 
 ```
 
@@ -286,9 +597,12 @@ plot_cat(df5, sector)
 plot_cat(df5, type_of_tb_p_ep)
 plot_cat(df5, xray)
 plot_cat(df5_top10, county)
-plot_cat(df5, type_of_patient)
-plot_cat(df5, gene_xpert)
+plot_cat(df5, type_of_patient) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot_cat(df5, gene_xpert) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 plot_cat(df5, sputum_smear_examination_2by3_month_result)
+plot_cat(df5, treatment_outcome)
 
 ```
 
@@ -442,6 +756,88 @@ mortality_by_period <- df7 %>%
   )
 
 
+```
+
+
+
+```{r, bivariet analysis,include=FALSE}
+#chisq.test(table(df5$sex_m_f, df5$treatment_outcome))
+chi_results <- list(
+  age_on_registration = chisq.test(table(df7$age_on_registration, df7$treatment_outcome)),
+  comorbidity = chisq.test(table(df7$comorbidity, df7$treatment_outcome)),
+  is_patient_prisoner = chisq.test(table(df7$is_patient_prisoner, df7$treatment_outcome)),
+  nutrition_support = chisq.test(table(df7$nutrition_support, df7$treatment_outcome))
+)
+
+# Extract relevant info into a dataframe
+chi_summary <- data.frame(
+  Variable = names(chi_results),
+  Chi_Square = sapply(chi_results, function(x) round(x$statistic, 2)),
+  DF = sapply(chi_results, function(x) x$parameter),
+  P_Value = sapply(chi_results, function(x) signif(x$p.value, 4))
+)
+
 
 ```
+
+
+
+```{r, include=TRUE}
+kable(chi_summary, 
+      caption = "Chi-Square Test Results",
+      align = "c",
+      digits = 3) %>%
+  kable_styling(full_width = FALSE,
+                bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+```{r, include=FALSE}
+sapply(df7[, c("sex_m_f", "age_on_registration", "bmi", "comorbidity", "is_patient_prisoner", "nutrition_support")], function(x) any(is.null(x)))
+
+```
+
+
+
+
+```{r, manipulation, include=FALSE}
+df8 <- df7 %>%
+  mutate(
+    sex_m_f = factor(sex_m_f, levels = c("male", "female")),
+    comorbidity = factor(comorbidity),
+    is_patient_prisoner = factor(is_patient_prisoner, levels = c("No","Yes")),
+    nutrition_support = factor(nutrition_support),
+    
+    
+    bmi = as.numeric(bmi),
+    age_on_registration = as.numeric(age_on_registration)
+    
+  
+  )
+```
+
+
+```{r, include=FALSE}
+df8$bmi[is.na(df8$bmi)] <- mean(df8$bmi, na.rm = TRUE)
+
+```
+
+
+
+```{r, include=FALSE}
+df8$outcome_binary <- ifelse(df8$treatment_outcome == "Cured", 0, 1)
+
+model <- glm(outcome_binary ~ sex_m_f + age_on_registration + bmi + comorbidity + is_patient_prisoner + nutrition_support,
+             data = df8, family = binomial)
+```
+
+
+```{r, include=FALSE}
+#summary(model)
+
+# Odds ratios + CI
+#exp(cbind(OR = coef(model), confint(model)))
+
+```
+
+
 
